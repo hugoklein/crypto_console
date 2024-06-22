@@ -1,59 +1,140 @@
 import flet as ft
+import json
+import os
+from ctrConsola import ctrConsola 
 
-#pagina principal
-def main(page: ft.Page):
-    page.spacing = 0
-    page.padding = 0
+class MainPage:
 
-    def handle_expansion_tile_change(e):
-        page.open(
-            ft.SnackBar(
-                ft.Text(f"ExpansionTile was {'expanded' if e.data=='true' else 'collapsed'}"),
-                duration=1000,
+    def __init__(self):
+        self.accounts = self.getAccounts()
+                
+    def getAccounts(self):
+        if os.path.exists("accounts.json"):
+            f = open("accounts.json","r")
+            self.accounts = json.loads(f.read())
+            f.close()                
+        else:
+            self.accounts = [
+                {"title": "Futuro Hugo",
+                 "broker": "Binance",
+                 "name" : "hugo",
+                 "wallet" : "future"
+                },
+                {"title": "Spot Hugo",
+                 "broker": "Binance",
+                 "name" : "hugo",
+                 "wallet" : "spot"
+                },
+                {"title": "Hugo",
+                 "broker": "Kucoin",
+                 "name" : "hugo",
+                 "wallet" : "future"
+                },
+                {"title": "Maru",
+                 "broker": "Kucoin",
+                 "name" : "maru",
+                 "wallet" : "future"
+                 }
+            ]
+            f = open("accounts.json", "w")
+            f.write(json.dumps(self.accounts))
+            f.close()
+
+        return self.accounts
+
+    def changeTab(self, e):
+        index = self.tabs.selected_index        
+        self.tabs.tabs[index].content.setFocusCommand()
+        self.page.update()
+        
+
+    def createTabs(self):
+        self.tabs = ft.Tabs(animation_duration=300)
+        for account in self.accounts:
+            ac = AccountContainer(account, self.page)            
+            self.tabs.tabs.append(ft.Tab( content=ac, text = account["title"]))
+            self.tabs.on_change = self.changeTab
+       
+        
+        return self.tabs
+
+    def main(self, page: ft.Page):
+        self.page = page
+        page.window_min_height = 1000
+        page.window_min_width = 1000
+        page.spacing = 0
+        page.padding = 0
+        page.title = "Crypto console"
+        self.tabs = self.createTabs()
+        page.add(self.tabs)
+               
+        page.dark_theme = ft.Theme(color_scheme_seed="teal")
+        page.theme_mode = ft.ThemeMode.DARK        
+        
+
+        page.update()
+
+class AccountContainer(ft.Container):
+    def __init__(self, account, page):
+        super().__init__()
+        self.account = account
+        self.page = page
+        self.content = self.createAccountContainer()
+
+    def build(self):
+        return self.content
+
+    def setFocusCommand(self):
+        self.cCommand.focus()
+
+    def sendCommand(self, e):
+        self.cRowsConsole.controls[0].controls.append(  ft.Text(self.cCommand.value))
+        self.cCommand.value = ""
+        self.setFocusCommand()
+
+        self.cRowsConsole.controls[0].scroll_to(offset=-1, duration=2000, curve=ft.AnimationCurve.EASE_IN_OUT)
+
+        self.page.update()
+
+    def createAccountContainer(self):
+        self.cPositions = ft.Container(
+            bgcolor = "green",
+            padding = 15,
+            col = 6,
+            content=ft.Column(controls=
+                [
+                    ft.Text("Posicion")
+                ],
+             
             )
         )
-        if e.control.trailing:
-            e.control.trailing.name = (
-                ft.icons.ARROW_DROP_DOWN
-                if e.control.trailing.name == ft.icons.ARROW_DROP_DOWN_CIRCLE
-                else ft.icons.ARROW_DROP_DOWN_CIRCLE
+        self.cCommand = ft.TextField(
+            label="Command:", 
+            prefix_text= f"{self.account['broker']}->{self.account['wallet']}[{self.account['name']}]: ", 
+            on_submit=self.sendCommand
             )
-            page.update()
+        
+        self.cRowsConsole = ctrConsola()
+        self.cRowsConsole.col = 12
 
-    page.add(
-        ft.ExpansionTile(
-            title=ft.Text("ExpansionTile 1"),
-            subtitle=ft.Text("Trailing expansion arrow icon"),
-            affinity=ft.TileAffinity.PLATFORM,
-            maintain_state=True,
-            collapsed_text_color=ft.colors.RED,
-            text_color=ft.colors.RED,
-            controls=[ft.ListTile(title=ft.Text("This is sub-tile number 1"))],
-        ),
-        ft.ExpansionTile(
-            title=ft.Text("ExpansionTile 2"),
-            subtitle=ft.Text("Custom expansion arrow icon"),
-            trailing=ft.Icon(ft.icons.ARROW_DROP_DOWN),
-            collapsed_text_color=ft.colors.GREEN,
-            text_color=ft.colors.PURPLE_700,
-            on_change=handle_expansion_tile_change,
-            controls=[ft.ListTile(title=ft.Text("This is sub-tile number 2"))],
-        ),
-        ft.ExpansionTile(
-            title=ft.Text("ExpansionTile 3"),
-            subtitle=ft.Text("Leading expansion arrow icon"),
-            affinity=ft.TileAffinity.LEADING,
-            initially_expanded=True,
-            collapsed_text_color=ft.colors.BLUE,
-            text_color=ft.colors.BLUE,
-            controls=[
-                ft.ListTile(title=ft.Text("This is sub-tile number 3")),
-                ft.ListTile(title=ft.Text("This is sub-tile number 4")),
-                ft.ListTile(title=ft.Text("This is sub-tile number 5")),
-                ft.ListTile(title=ft.Text("This is sub-tile número 8")),
-            ],
-        ),
-    )
+        self.cConsoleOut = ft.Container(
+            bgcolor="red",            
+            padding = 15,            
+            expand = True,
+            col = 6,
+            content = ft.ResponsiveRow(controls=
+                [                    
+                    self.cRowsConsole                    
+                ]
+            ),
+            
+        )                
+        return ft.ResponsiveRow(
+                controls=
+                [
+                    self.cConsoleOut,
+                    self.cPositions                                    
+                ], expand=True)
 
-
-ft.app(target=main)
+p = MainPage()
+ft.app(target=p.main)
